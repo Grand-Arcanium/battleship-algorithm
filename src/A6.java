@@ -14,14 +14,19 @@ public class A6 {
         // All logic must be added to your Bot implementation
         // see fireShot in the ExampleBot class
 
-        final int NUMBEROFGAMES = 10000;
+        final int NUMBEROFGAMES = 1; // 10000
         System.out.println(NUMBEROFGAMES);
         System.out.println(BattleShip2.getVersion());
-        BattleShip2 battleShip = new BattleShip2(NUMBEROFGAMES, new ExampleBot());
+        BattleShip2 battleShip = new BattleShip2(NUMBEROFGAMES, new SSCairnsBot());
         int [] gameResults = battleShip.run();
 
         // You may add some analysis code to look at all the game scores that are returned in gameResults
         // This can be useful for debugging purposes.
+
+        // print result for each game
+        for (int i = 0; i < gameResults.length; i++){
+            System.out.println("Result of Game #" + i + ": " + gameResults[i]);
+        }
 
         battleShip.reportResults();
     }
