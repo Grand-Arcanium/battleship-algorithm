@@ -11,11 +11,14 @@ import java.util.*;
  * @author mark.yendt@mohawkcollege.ca (Dec 2021)
  */
 public class SSCairnsBot implements BattleShipBot {
+    private static int[][] initHeatmap = null;
     private int gameSize;
     private BattleShip2 battleShip;
     private Random random;
+
     private int[][] heatMap;
     ArrayList<Integer> existingShips;
+
     // mode vars
     private boolean isHunt;
     private int parity;
@@ -34,6 +37,10 @@ public class SSCairnsBot implements BattleShipBot {
     public void initialize(BattleShip2 b) {
         battleShip = b;
         gameSize = BattleShip2.BOARD_SIZE;
+        gameSize = b.BOARD_SIZE;
+
+        if (initHeatmap == null) // instantiate base heatmap
+            createHeatmap();
 
         heatMap = new int[gameSize][gameSize];
         isHunt = true; // set mode
@@ -148,7 +155,7 @@ public class SSCairnsBot implements BattleShipBot {
     *
     * */
 
-    private int[][] createHeatMap() {
+    private void createHeatmap() {
         // create board
         for (int y = 0; y < heatMap.length; y++) {
             for (int x = 0; x < heatMap[y].length; x++) {
@@ -157,9 +164,6 @@ public class SSCairnsBot implements BattleShipBot {
 
             }
         }
-
-        return null;
-
 
     }
 
@@ -212,6 +216,17 @@ public class SSCairnsBot implements BattleShipBot {
             }
         }
 
+        /*
+
+        // call check if sunk
+        if (hasDestroyedShip()) {
+        hitCount = 0;
+        changeMode(); // go back to hunt mode
+        }
+
+        */
+
+
         checkHunt();
         return nTarget;
     }
@@ -244,29 +259,57 @@ public class SSCairnsBot implements BattleShipBot {
      * */
     private boolean hasDestroyedShip() {
 
-        // the diff between battleship's length and existing ships keeps track of how many
-        // ships are destroyed for the whole game
-        // this compares it with the recently updated value taken from the ships sunk method
-        // eg. if we know we have a diff of 2 ships from the original, but the
-        // method returns 3 sunken ships, then we know a ship has been destroyed since
+        /*
+         the diff between battleship's length and existing ships keeps track of how many
+         ships are destroyed for the whole game
+         this compares it with the recently updated value taken from the ships sunk method
+         eg. if we know we have a diff of 2 ships from the original, but the
+         method returns 3 sunken ships, then we know a ship has been destroyed since
+
+        ok so assume currently hitting a ship of size 4
+
+        target()
+        M R1 R2 R3 O
+
+        with this function, hitting R4 then checking if sunk will already end the target
+
+        M R1 R2 R3 R4 -> hunt()
+
+        instead of having to check for an R5 that we know doesnt exist
+        M R1 R2 R3 R4 0 -> target()
+        M R1 R2 R3 R4 M -> hunt()
+
+        */
+
         if (battleShip.numberOfShipsSunk() >
                         ( battleShip.getShipSizes().length - existingShips.size() )){
-
             // update existing ship tracker
+            // TODO: should be a better way to find the right index to remove than iterating in a for loop
             for (int i = 0; i < existingShips.size(); i++) {
                 if (existingShips.get(i) == hitCount) {
                     existingShips.remove(i);
                     break;
                 }
             }
-
             return true;
         }
 
         return false;
     }
 
+    private boolean isCorner(int x, int y) {
+        int length = heatMap.length; // both x and y
 
+        return (x == 0 || x == length - 1) && (y == 0 || y == length - 1);
+
+    }
+
+    private boolean isEdge(int x, int y) {
+        int length = heatMap.length; // both x and y
+
+        return ((x == 0 || x == length - 1) && (y < length - 1 && y > 0))  // left and right edge
+            || ((y == 0 || y == length - 1) && (x < length - 1 && x > 0)); // up and down edge
+    }
 
     /**
      * Authorship of the solution - must return names of all students that contributed to
@@ -276,6 +319,6 @@ public class SSCairnsBot implements BattleShipBot {
 
     @Override
     public String getAuthors() {
-        return "Mark Yendt (CSAIT Professor)";
+        return "Mauricio Canul and Mari Shenzhen Uy";
     }
 }
