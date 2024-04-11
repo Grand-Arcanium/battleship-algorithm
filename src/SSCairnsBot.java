@@ -2,10 +2,7 @@
 import battleship.*;
 
 import java.awt.Point;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Random;
+import java.util.*;
 
 /**
  * A Sample random shooter - Takes no precaution on double shooting and has no strategy once
@@ -17,16 +14,15 @@ public class SSCairnsBot implements BattleShipBot {
     private int gameSize;
     private BattleShip2 battleShip;
     private Random random;
-
     private int[][] heatMap;
     ArrayList<Integer> existingShips;
-
     // mode vars
     private boolean isHunt;
     private int parity;
     private int hitCount;
-
-
+    private HashSet<Point> used;
+    private Point huntedTarget;
+    private Stack<Point> pTargets;
 
     /**
      * Constructor keeps a copy of the BattleShip instance
@@ -37,7 +33,7 @@ public class SSCairnsBot implements BattleShipBot {
     @Override
     public void initialize(BattleShip2 b) {
         battleShip = b;
-        gameSize = b.BOARD_SIZE;
+        gameSize = BattleShip2.BOARD_SIZE;
 
         heatMap = new int[gameSize][gameSize];
         isHunt = true; // set mode
@@ -55,6 +51,7 @@ public class SSCairnsBot implements BattleShipBot {
         // This is needed if you are trying to improve the performance of your code
 
         random = new Random(0xDEADBEEF);   // Needed for random shooter - not required for more systematic approaches
+        used = new HashSet<>();
     }
 
     /**
@@ -66,29 +63,49 @@ public class SSCairnsBot implements BattleShipBot {
     @Override
     public void fireShot() {
 
+        Point objective;
         if (isHunt) {
-            hunt();
+            objective = hunt();
         } else { // target mode
-            target();
+            objective = target();
         }
-
-        // get x and y
-        int x = random.nextInt(gameSize);
-        int y = random.nextInt(gameSize);
-
         // Will return true if hit a ship
-        boolean hit = battleShip.shoot(new Point(x,y));
+        boolean hit = battleShip.shoot(objective);
 
         // check if mode needs to be changed
         if (hit && isHunt) { // hunting mode, but then hits something -> go into target mode
             isHunt = false;
-            heatMap[y][x] = 0;
+            //heatMap[y][x] = 0;
             hitCount++;
-        } else if (hit && !isHunt){ // target mode, and hits -> stay in target mode
-            heatMap[y][x] = 0;
+            huntedTarget = objective;
+            pTargets = setUpTargets(objective);
+            //heatMap[y][x] = 0;
+        } else if (!hit && !isHunt){
+            // This is what is killing 4th(ex), it will delete ref, then ref2, ref3 find nothing at ref4 and assume there was nothing to the right (ref is left direction)
+            pTargets.pop();
+            checkHunt();
         }
 
+    }
 
+    private Stack<Point> setUpTargets(Point curPoint) {
+        Stack<Point> possibleTargets = new Stack<>();
+
+        if (curPoint.x != 0 && !used.contains(new Point(curPoint.x - 1, curPoint.y))){
+            possibleTargets.push(new Point(curPoint.x - 1, curPoint.y));
+        }
+        if (curPoint.x + 1 < gameSize  && !used.contains(new Point(curPoint.x + 1, curPoint.y))){
+            possibleTargets.push(new Point(curPoint.x + 1, curPoint.y));
+        }
+        if (curPoint.y != 0  && !used.contains(new Point(curPoint.x, curPoint.y - 1))){
+            possibleTargets.push(new Point(curPoint.x, curPoint.y - 1));
+        }
+        if (curPoint.y + 1 < gameSize  && !used.contains(new Point(curPoint.x, curPoint.y + 1))){
+            possibleTargets.push(new Point(curPoint.x, curPoint.y + 1));
+        }
+        System.out.println(huntedTarget + "" + possibleTargets);
+
+        return possibleTargets;
     }
 
     /*
@@ -146,7 +163,7 @@ public class SSCairnsBot implements BattleShipBot {
 
     }
 
-    private void hunt() {
+    private Point hunt() {
         // open parity filter
         // parity++ after the shortest ship is struck
 
@@ -159,9 +176,17 @@ public class SSCairnsBot implements BattleShipBot {
         // OR
         // hit mod parity
 
+        // get x and y
+        int x;
+        int y;
+        do {
+            x = random.nextInt(gameSize);
+            y = random.nextInt(gameSize);
+        } while(!used.add(new Point(x, y)));
+        return new Point(x, y);
     }
 
-    private void target() {
+    private Point target() {
         // dont use parity filter
         // hit around current x y
 
@@ -172,11 +197,23 @@ public class SSCairnsBot implements BattleShipBot {
         // after missing both, definitely sunk
 
         // call check if sunk
-        if (hasDestroyedShip()) {
-            hitCount = 0;
-            changeMode(); // go back to hunt mode
+
+        Point nTarget = pTargets.pop();
+
+        Point additionalTarget;
+
+        int xDif = nTarget.x - huntedTarget.x;
+        int yDif = nTarget.y - huntedTarget.y;
+
+        if((nTarget.x + xDif > 0) && (nTarget.y + yDif > 0) && (nTarget.x + xDif < gameSize) &&  (nTarget.y + yDif < gameSize)){
+            additionalTarget = new Point(nTarget.x + xDif, nTarget.y + yDif);
+            if(!used.contains(additionalTarget)){
+                pTargets.push(additionalTarget);
+            }
         }
 
+        checkHunt();
+        return nTarget;
     }
 
     private int updateParity() {
@@ -192,6 +229,13 @@ public class SSCairnsBot implements BattleShipBot {
     private void changeMode() {
         isHunt = !isHunt;
     }
+
+    private void checkHunt(){
+        if(pTargets.size() == 0){
+            changeMode();
+        }
+    }
+
 
     /**
      * Checks if a ship was destroyed, and updates the existing ship list if it did.
