@@ -37,7 +37,6 @@ public class SSCairnsBot implements BattleShipBot {
     public void initialize(BattleShip2 b) {
         battleShip = b;
         gameSize = BattleShip2.BOARD_SIZE;
-        gameSize = b.BOARD_SIZE;
 
         if (initHeatmap == null) // instantiate base heatmap
             createHeatmap();
