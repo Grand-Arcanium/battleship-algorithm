@@ -14,7 +14,7 @@ public class A6 {
         // All logic must be added to your Bot implementation
         // see fireShot in the ExampleBot class
 
-        final int NUMBEROFGAMES = 1; // 10000
+        final int NUMBEROFGAMES = 10000; // 10000
         System.out.println(NUMBEROFGAMES);
         System.out.println(BattleShip2.getVersion());
         BattleShip2 battleShip = new BattleShip2(NUMBEROFGAMES, new SSCairnsBot());

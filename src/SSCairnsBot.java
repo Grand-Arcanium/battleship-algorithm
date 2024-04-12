@@ -15,7 +15,6 @@ public class SSCairnsBot implements BattleShipBot {
     private int gameSize;
     private BattleShip2 battleShip;
     private Random random;
-
     private int[][] heatMap;
     ArrayList<Integer> existingShips;
 
@@ -26,6 +25,9 @@ public class SSCairnsBot implements BattleShipBot {
     private HashSet<Point> used;
     private Point huntedTarget;
     private Stack<Point> pTargets;
+    private Stack<String> directions;
+    private String checking;
+    private String successDir;
 
     /**
      * Constructor keeps a copy of the BattleShip instance
@@ -38,8 +40,10 @@ public class SSCairnsBot implements BattleShipBot {
         battleShip = b;
         gameSize = BattleShip2.BOARD_SIZE;
 
+        /*
         if (initHeatmap == null) // instantiate base heatmap
             createHeatmap();
+        */
 
         heatMap = new int[gameSize][gameSize];
         isHunt = true; // set mode
@@ -56,8 +60,11 @@ public class SSCairnsBot implements BattleShipBot {
         // Need to use a Seed if you want the same results to occur from run to run
         // This is needed if you are trying to improve the performance of your code
 
-        random = new Random(0xDEADBEEF);   // Needed for random shooter - not required for more systematic approaches
+        random = new Random();   // Needed for random shooter - not required for more systematic approaches
+
         used = new HashSet<>();
+        pTargets = new Stack<>();
+        directions = new Stack<>();
     }
 
     /**
@@ -68,7 +75,7 @@ public class SSCairnsBot implements BattleShipBot {
 
     @Override
     public void fireShot() {
-
+        kludgeCheck();
         Point objective;
         if (isHunt) {
             objective = hunt();
@@ -84,34 +91,23 @@ public class SSCairnsBot implements BattleShipBot {
             //heatMap[y][x] = 0;
             hitCount++;
             huntedTarget = objective;
-            pTargets = setUpTargets(objective);
+            setUpTargets(objective);
             //heatMap[y][x] = 0;
+        } else if(hit && !isHunt){
+            successDir = checking;
+            followUpTarget(objective);
+            trimMismatches();
         } else if (!hit && !isHunt){
             // This is what is killing 4th(ex), it will delete ref, then ref2, ref3 find nothing at ref4 and assume there was nothing to the right (ref is left direction)
-            pTargets.pop();
-            checkHunt();
         }
-
+        if(!isHunt && pTargets.size() == 0) {
+            isHunt = true;
+            successDir = null;
+        }
     }
 
-    private Stack<Point> setUpTargets(Point curPoint) {
-        Stack<Point> possibleTargets = new Stack<>();
-
-        if (curPoint.x != 0 && !used.contains(new Point(curPoint.x - 1, curPoint.y))){
-            possibleTargets.push(new Point(curPoint.x - 1, curPoint.y));
-        }
-        if (curPoint.x + 1 < gameSize  && !used.contains(new Point(curPoint.x + 1, curPoint.y))){
-            possibleTargets.push(new Point(curPoint.x + 1, curPoint.y));
-        }
-        if (curPoint.y != 0  && !used.contains(new Point(curPoint.x, curPoint.y - 1))){
-            possibleTargets.push(new Point(curPoint.x, curPoint.y - 1));
-        }
-        if (curPoint.y + 1 < gameSize  && !used.contains(new Point(curPoint.x, curPoint.y + 1))){
-            possibleTargets.push(new Point(curPoint.x, curPoint.y + 1));
-        }
-        System.out.println(huntedTarget + "" + possibleTargets);
-
-        return possibleTargets;
+    private void kludgeCheck() {
+        if(used.size() >= gameSize * gameSize) throw new RuntimeException("We ran out of places to search!");
     }
 
     /*
@@ -167,19 +163,23 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     private Point hunt() {
-        // open parity filter
-        // parity++ after the shortest ship is struck
+        /*
 
-        // choose based on algorithm
-        // or choose at random
+        - open parity filter
+          parity++ after the shortest ship is struck
 
-        // hit
-        // if still in hunt, hit + parity in one direction
-        // continue in other directions
-        // OR
-        // hit mod parity
+        - choose based on algorithm
+          or choose at random
 
-        // get x and y
+        - hit
+          if still in hunt, hit + parity in one direction
+          continue in other directions
+          OR
+          hit mod parity
+
+        - get x and y
+         */
+
         int x;
         int y;
         do {
@@ -189,31 +189,44 @@ public class SSCairnsBot implements BattleShipBot {
         return new Point(x, y);
     }
 
-    private Point target() {
-        // dont use parity filter
-        // hit around current x y
-
-        // hit all directions to find next part of ship
-        // then after finding 2nd segment check opposite
-        // alternate in both directions until miss in one direction
-        // if miss, focus on opposite side until miss
-        // after missing both, definitely sunk
-
-        // call check if sunk
-
-        Point nTarget = pTargets.pop();
-
-        Point additionalTarget;
-
-        int xDif = nTarget.x - huntedTarget.x;
-        int yDif = nTarget.y - huntedTarget.y;
-
-        if((nTarget.x + xDif > 0) && (nTarget.y + yDif > 0) && (nTarget.x + xDif < gameSize) &&  (nTarget.y + yDif < gameSize)){
-            additionalTarget = new Point(nTarget.x + xDif, nTarget.y + yDif);
-            if(!used.contains(additionalTarget)){
-                pTargets.push(additionalTarget);
-            }
+    private void setUpTargets(Point curPoint) {
+        if (leftAvail(curPoint.x) && !used.contains(new Point(curPoint.x - 1, curPoint.y))){
+            targetEntry("horizontal", new Point(curPoint.x - 1, curPoint.y));
         }
+        if (rightAvail(curPoint.x)  && !used.contains(new Point(curPoint.x + 1, curPoint.y))){
+            targetEntry("horizontal", new Point(curPoint.x + 1, curPoint.y));
+        }
+        if (topAvail(curPoint.y)  && !used.contains(new Point(curPoint.x, curPoint.y - 1))){
+            targetEntry("vertical", new Point(curPoint.x, curPoint.y - 1));
+        }
+        if (bottomAvail(curPoint.y) && !used.contains(new Point(curPoint.x, curPoint.y + 1))){
+            targetEntry("vertical", new Point(curPoint.x, curPoint.y + 1));
+        }
+    }
+
+    private void targetEntry(String direction, Point pointToAdd) {
+        directions.push(direction);
+        pTargets.push(pointToAdd);
+    }
+
+    private Point target() {
+        /*
+        - dont use parity filter
+          hit around current x y
+
+        - hit all directions to find next part of ship
+          then after finding 2nd segment check opposite
+          alternate in both directions until miss in one direction
+          if miss, focus on opposite side until miss
+          after missing both, definitely sunk
+
+        - call check if sunk
+        */
+
+        Point cTarget = pTargets.pop();
+        checking = directions.pop();
+        used.add(cTarget);
+        return cTarget;
 
         /*
 
@@ -224,10 +237,29 @@ public class SSCairnsBot implements BattleShipBot {
         }
 
         */
+    }
 
+    private void followUpTarget(Point nTarget){
+        Point additionalTarget;
 
-        checkHunt();
-        return nTarget;
+        int xDif = (nTarget.x - huntedTarget.x != 0) ? (nTarget.x - huntedTarget.x > 0) ? 1 : -1 : 0;
+        int yDif = (nTarget.y - huntedTarget.y != 0) ? (nTarget.y - huntedTarget.y > 0) ? 1 : -1 : 0;
+
+        additionalTarget = new Point(nTarget.x + xDif, nTarget.y + yDif);
+
+        if(additionalTarget.x >= 0 && additionalTarget.x < gameSize && additionalTarget.y >= 0 && additionalTarget.y < gameSize){
+            if(!used.contains(additionalTarget)){
+                directions.push(successDir);
+                pTargets.push(additionalTarget);
+            }
+        }
+    }
+
+    private void trimMismatches(){
+        while(directions.size() > 0 && !directions.peek().equals(successDir)){
+            directions.pop();
+            used.add(pTargets.pop());
+        }
     }
 
     private int updateParity() {
@@ -297,17 +329,25 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     private boolean isCorner(int x, int y) {
-        int length = heatMap.length; // both x and y
-
-        return (x == 0 || x == length - 1) && (y == 0 || y == length - 1);
-
+        return (!leftAvail(x) || !rightAvail(x)) && (!topAvail(y) || !bottomAvail(y));
     }
 
     private boolean isEdge(int x, int y) {
-        int length = heatMap.length; // both x and y
+        return (!leftAvail(x) || !rightAvail(x)) && (topAvail(y) || bottomAvail(y))  // left and right edge
+            || (leftAvail(x) || rightAvail(x)) && (!topAvail(y) || !bottomAvail(y)); // up and down edge
+    }
 
-        return ((x == 0 || x == length - 1) && (y < length - 1 && y > 0))  // left and right edge
-            || ((y == 0 || y == length - 1) && (x < length - 1 && x > 0)); // up and down edge
+    private boolean leftAvail(int x){
+        return x > 0;
+    }
+    private boolean rightAvail(int x){
+        return x < gameSize - 1;
+    }
+    private boolean topAvail(int y){
+        return y > 0;
+    }
+    private boolean bottomAvail(int y){
+        return y < gameSize - 1;
     }
 
     /**
