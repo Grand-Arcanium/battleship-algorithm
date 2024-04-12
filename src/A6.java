@@ -8,13 +8,11 @@ import battleship.BattleShip2;
 public class A6 {
     public static void main(String[] args) {
 
-        /* Henlo Mari */
-
         // DO NOT add any logic to this code
         // All logic must be added to your Bot implementation
         // see fireShot in the ExampleBot class
 
-        final int NUMBEROFGAMES = 100000; // 10000
+        final int NUMBEROFGAMES = 1; // 10000
         System.out.println(NUMBEROFGAMES);
         System.out.println(BattleShip2.getVersion());
         BattleShip2 battleShip = new BattleShip2(NUMBEROFGAMES, new SSCairnsBot());
@@ -25,6 +23,7 @@ public class A6 {
 
         // print result for each game
 
+        // print if perfect or waaaaay too high
         for (int i = 0; i < gameResults.length; i++){
             if (gameResults[i] == 24 || gameResults[i] >= 225) System.out.println("Result of Game #" + i + ": " + gameResults[i]);
         }
