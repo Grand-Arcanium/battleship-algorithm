@@ -5,6 +5,12 @@ import java.util.*;
 
 /**
  * <p>
+ *     We, Mauricio Canul - 000881810 and Mari Shenzhen Uy - 000824752, certify that this material
+ *     is our original work. No other person's work has been used without suitable acknowledgment
+ *     and we have not made this work available to anyone else.
+ * </p>
+ *
+ * <p>
  *      A simple Battleship bot, employing a simple Seek and Destroy algorithm with which it
  *      searches at random for the ships of the opponent, until it hits any of its spots, where
  *      it then will follow up and check adjacent spots until it has sunk it.
@@ -119,11 +125,19 @@ public class SSCairnsBot implements BattleShipBot {
     private Stack<Point> sinkingShip;
 
     /**
+     * <p>Used as a "boolean" that can only happen once per operation</p>
+     * <p> hasFoundDir = hfd</p>
+     * <p>- hfd <= 0 -> False <br/> - hfd == 1 -> True <br/> - hfd > 1 -> False</p>
+     * <p>Set to 0 at the start of the game, set to 1 during the second
+     * successful hit of a hunt, and ignored every hit after</p>
+     */
+    private int hasFoundDir;
+
+    /**
      * Constructor keeps a copy of the BattleShip instance
-     * Create instances of any Data Structures and initialize any variables here
+     * Creates instances of needed Data Structures and variables
      * @param b previously created battleship instance - should be a new game
      */
-
     @Override
     public void initialize(BattleShip2 b) {
         battleShip = b;
@@ -159,14 +173,33 @@ public class SSCairnsBot implements BattleShipBot {
         pTargets = new Stack<>();
         directions = new Stack<>();
         sinkingShip = new Stack<>();
+        hasFoundDir = 0;
     }
 
     /**
-     * Create a random shot and calls the battleship shoot method
-     * Put all logic here (or in other methods called from here)
-     * The BattleShip API will call your code until all ships are sunk
+     * <p>
+     *     Will actively shoot at random, this is called the "Seek" mode, it may enter
+     *     "Destroy" mode once a ship has been located (directly hit) which will prompt
+     *     it to create a stack of possible targets.
+     * </p>
+     *
+     * <p>
+     *     It may discard possible targets after finding out the direction the ship is
+     *     facing or after checking that its current amount of shots made is equal to the
+     *     biggest ship still in the game (at which point said ship is discarded from the
+     *     array of valid ships)
+     * </p>
+     * <p>
+     *     It may add "follow up" targets to the list of possible targets if it finds that
+     *     the ship it is shooting at could be bigger (if it is in its 3rd shot, moving
+     *     downward, and there's space left, and there's still a ship of size 4 or bigger
+     *     it will add the next spot as a possible target).
+     * </p>
+     * <p>
+     *     A Hunt/Destruction is over once the stack of possible targets is empty or the
+     *     destruction of the ship has been confirmed.
+     * </p>
      */
-
     @Override
     public void fireShot() {
         Point objective;
@@ -174,12 +207,14 @@ public class SSCairnsBot implements BattleShipBot {
             objective = seeking();
         } else { // target mode
             objective = destroy();
+            //System.out.print("nTarget: " + objective);
         }
         // Will return true if hit a ship
         boolean hit = battleShip.shoot(objective);
 
         // check if mode needs to be changed
         if (hit && seeking) { // Seeking mode, but then hits something -> go into Destroy mode
+            //System.out.println("Hunt has started with: " + objective);
             seeking = false;
             //heatMap[y][x] = 0;
             hitCount++;
@@ -188,22 +223,36 @@ public class SSCairnsBot implements BattleShipBot {
             sinkingShip.push(objective);
             //heatMap[y][x] = 0;
         } else if(hit && !seeking){ // remains in target mode
+            //System.out.print("Hit! \n");
             hitCount++;
             successDir = checking;
+            hasFoundDir++;
             sinkingShip.push(objective);
-            followUpTarget(objective);
-            trimMismatches();
-        } else if (!hit){ // hunting but no hit
-            //used.add(objective);
+            if(!hasDestroyedLargest()){
+                followUpTarget(objective);
+            } else {
+                eliminateRemnants();
+            }
+        } /*else if(!hit && !seeking){
+            System.out.print("Miss! \n");
+        }
+        */
 
+        if (hasFoundDir == 1) {
+            trimMismatches();
+            hasFoundDir++;
         }
         if(!seeking && pTargets.size() == 0) {
+            removeShip(hitCount);
+            //System.out.println("removed: " + hitCount + "\nremaining: " + existingShips);
             updateParity(hitCount);
             hitCount = 0;
             seeking = true;
             successDir = null;
             eliminateAdjacent();
+            hasFoundDir = 0;
         }
+
         kludgeCheck();
     }
 
@@ -215,10 +264,6 @@ public class SSCairnsBot implements BattleShipBot {
      */
     private void kludgeCheck() {
         if(used.size() == (gameSize * gameSize)) {
-            /*
-            System.out.println(used.size());
-            System.out.println(battleShip.allSunk());
-            */
             if(!battleShip.allSunk()){
                 throw new RuntimeException("We ran out of places to search!");
             }
@@ -226,7 +271,7 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     /**
-     *
+     * Holdover WIP function for the "Smart chance-based" method, currently goes unused.
      */
     private void createHeatmap() {
         // create board
@@ -240,19 +285,18 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     /**
-     *
-     * @return
+     * Function used while there are no candidates for possible targets or locations
+     * of ships, in its current state will shoot at random until it hits something
+     * and may only shoot at positions that have not been chosen in the past
+     * @return Point to shoot at
      */
     private Point seeking() {
         int x;
         int y;
-
         do {
             x = random.nextInt(gameSize * parity) / parity;
             y = random.nextInt(gameSize * parity) / parity;
         } while(!used.add(new Point(x, y)));
-
-        //System.out.println("new hunt point: " + x + "," + y);
         return new Point(x, y);
     }
 
@@ -298,19 +342,10 @@ public class SSCairnsBot implements BattleShipBot {
      * @return The next point to be fired at
      */
     private Point destroy() {
-
         Point cTarget = pTargets.pop();
         checking = directions.pop();
         used.add(cTarget);
         return cTarget;
-
-        /*
-        // call check if sunk
-        if (hasDestroyedShip()) {
-        hitCount = 0;
-        changeMode(); // go back to hunt mode
-        }
-        */
     }
 
     /**
@@ -321,6 +356,7 @@ public class SSCairnsBot implements BattleShipBot {
      * @param nTarget the last target to be hit during Destroy mode
      */
     private void followUpTarget(Point nTarget){
+
         Point additionalTarget;
 
         int xDif = (nTarget.x - huntedTarget.x != 0) ? (nTarget.x - huntedTarget.x > 0) ? 1 : -1 : 0;
@@ -342,9 +378,22 @@ public class SSCairnsBot implements BattleShipBot {
      * direction)
      */
     private void trimMismatches(){
-        while(directions.size() > 0 && !directions.peek().equals(successDir)){
-            directions.pop();
-            used.add(pTargets.pop());
+        Stack<Point> filteredPoints = new Stack<>();
+        Stack<String> filteredDir = new Stack<>();
+
+        while(pTargets.size() > 0){
+            if(directions.peek().equals(successDir)){
+                filteredPoints.push(pTargets.pop());
+                filteredDir.push(directions.pop());
+            } else {
+                directions.pop();
+                used.add(pTargets.pop());
+            }
+        }
+
+        while (filteredDir.size() > 0){
+            pTargets.push(filteredPoints.pop());
+            directions.push(filteredDir.pop());
         }
     }
 
@@ -374,8 +423,22 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     /**
-     *
-     * @param hitCount
+     * Function used to eliminate any remaining tiles from the pTargets stack
+     * in the case that said possible targets can be assumed to be misses
+     * (in cases such as "Largest ship has already been destroyed" / "current
+     * hit count indicates THIS IS largest ship")
+     */
+    private void eliminateRemnants(){
+        while (pTargets.size() > 0){
+            used.add(pTargets.pop());
+        }
+    }
+
+    /**
+     * Used to update the parity of the hunting algorithm, as parity is still a method based
+     * on chance effects of such an adjustment in the algorithm are still not entirely well
+     * understood, however it should increase chances of a hunt commencing
+     * @param hitCount current amount of hits made
      */
     private void updateParity(int hitCount) {
 
@@ -387,17 +450,16 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     /**
-     * Checks if a ship was destroyed, and updates the existing ship list if it did.
-     *
-     * @return if a ship was destroyed at a given point
+     * Checks if the largest ship has been destroyed.
+     * @return True if the largest ship was destroyed based on current hitcount
      * */
-    private boolean hasDestroyedShip() {
+    private boolean hasDestroyedLargest() {
 
         /*
          the diff between battleship's length and existing ships keeps track of how many
          ships are destroyed for the whole game
          this compares it with the recently updated value taken from the ships sunk method
-         eg. if we know we have a diff of 2 ships from the original, but the
+         ex. if we know we have a diff of 2 ships from the original, but the
          method returns 3 sunken ships, then we know a ship has been destroyed since
 
         ok so assume currently hitting a ship of size 4
@@ -414,21 +476,17 @@ public class SSCairnsBot implements BattleShipBot {
         M R1 R2 R3 R4 M -> hunt()
 
         */
+        return Collections.max(existingShips) == hitCount;
 
-        if (battleShip.numberOfShipsSunk() >
-                        ( battleShip.getShipSizes().length - existingShips.size() )){
-            // update existing ship tracker
-            // TODO: should be a better way to find the right index to remove than iterating in a for loop
-            for (int i = 0; i < existingShips.size(); i++) {
-                if (existingShips.get(i) == hitCount) {
-                    existingShips.remove(i);
-                    break;
-                }
-            }
-            return true;
-        }
+    }
 
-        return false;
+    /**
+     * Function used to remove a ship of a specific size, used to declare
+     * said ship has been removed from the game
+     * @param targetSize the size of the ship to be removed
+     */
+    private void removeShip(int targetSize){
+        existingShips.remove((Integer) targetSize);
     }
 
     /**

@@ -8,8 +8,6 @@ import battleship.BattleShip2;
 public class A6 {
     public static void main(String[] args) {
 
-        /* Henlo Mari */
-
         // DO NOT add any logic to this code
         // All logic must be added to your Bot implementation
         // see fireShot in the ExampleBot class
