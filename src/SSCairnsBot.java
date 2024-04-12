@@ -17,6 +17,7 @@ public class SSCairnsBot implements BattleShipBot {
     private Random random;
     private int[][] heatMap;
     ArrayList<Integer> existingShips;
+    Queue<Integer> shipsQ; // ships for parity
 
     // mode vars
     private boolean isHunt;
@@ -48,14 +49,18 @@ public class SSCairnsBot implements BattleShipBot {
 
         heatMap = new int[gameSize][gameSize];
         isHunt = true; // set mode
-        parity = 0;
+        parity = 2;
         hitCount = 0;
 
         // create list of ships
         int[] ships = battleShip.getShipSizes();
+        shipsQ = new ArrayDeque<>();
+
         existingShips = new ArrayList<>(ships.length);
         for (int ship : ships) {
             existingShips.add(ship);
+            shipsQ.add(ship);
+
         }
 
         // Need to use a Seed if you want the same results to occur from run to run
@@ -95,15 +100,19 @@ public class SSCairnsBot implements BattleShipBot {
             setUpTargets(objective);
             sinkingShip.push(objective);
             //heatMap[y][x] = 0;
-        } else if(hit && !isHunt){
+        } else if(hit && !isHunt){ // remains in target mode
+            hitCount++;
             successDir = checking;
             sinkingShip.push(objective);
             followUpTarget(objective);
             trimMismatches();
-        } else if (!hit && !isHunt){
-            // This is what is killing 4th(ex), it will delete ref, then ref2, ref3 find nothing at ref4 and assume there was nothing to the right (ref is left direction)
+        } else if (!hit){ // hunting but no hit
+            //used.add(objective);
+
         }
         if(!isHunt && pTargets.size() == 0) {
+            updateParity(hitCount);
+            hitCount = 0;
             isHunt = true;
             successDir = null;
             eliminateAdjacent();
@@ -121,46 +130,6 @@ public class SSCairnsBot implements BattleShipBot {
         }
     }
 
-    /*
-    * - make board -> % chance of ship
-    * - algorithm to find that %
-    * - 2 states: hunt, target
-    * - no hit = hunt, hit = target until no more ship
-    * - update % after every hit
-    * - hunt must target best %, target also gets best % relative to last hit
-    *
-    *
-    * fireShot()
-    *
-    * if hunt mode
-    * hunt() -> return x,y
-    *
-    * shoot(x,y)
-    * check if hit
-    *
-    * if hunt
-    * hit? -> change to target mode
-    * no hit? -> stay hunt mode
-    * LOOP
-    *
-    *
-    * fireShot ()
-    *
-    * if target
-    * target() -> return x,y
-    *
-    * shoot
-    * check if hit
-    *
-    * if target
-    * hit? -> stay target
-    * no hit? -> stay target
-    * some check if sunk ship -> change to hunt if sunk
-    * LOOP
-    *
-    *
-    * */
-
     private void createHeatmap() {
         // create board
         for (int y = 0; y < heatMap.length; y++) {
@@ -174,29 +143,15 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     private Point hunt() {
-        /*
-
-        - open parity filter
-          parity++ after the shortest ship is struck
-
-        - choose based on algorithm
-          or choose at random
-
-        - hit
-          if still in hunt, hit + parity in one direction
-          continue in other directions
-          OR
-          hit mod parity
-
-        - get x and y
-         */
-
         int x;
         int y;
+
         do {
-            x = random.nextInt(gameSize);
-            y = random.nextInt(gameSize);
+            x = random.nextInt(gameSize * parity) / parity;
+            y = random.nextInt(gameSize * parity) / parity;
         } while(!used.add(new Point(x, y)));
+
+        //System.out.println("new hunt point: " + x + "," + y);
         return new Point(x, y);
     }
 
@@ -221,18 +176,6 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     private Point target() {
-        /*
-        - dont use parity filter
-          hit around current x y
-
-        - hit all directions to find next part of ship
-          then after finding 2nd segment check opposite
-          alternate in both directions until miss in one direction
-          if miss, focus on opposite side until miss
-          after missing both, definitely sunk
-
-        - call check if sunk
-        */
 
         Point cTarget = pTargets.pop();
         checking = directions.pop();
@@ -291,10 +234,14 @@ public class SSCairnsBot implements BattleShipBot {
         }
     }
 
-    private int updateParity() {
-        int activeShips = battleShip.numberOfShipsSunk();
-        // go from hit every 2, then 3 bc of 2 already being sunk, and so on
-        return 0;
+    private void updateParity(int hitCount) {
+
+        int check = shipsQ.peek() == null? -1 : shipsQ.peek(); // get the front, which is the smallest ship
+        if (check == hitCount) { // only increase parity if the smallest ship is gone
+            parity++;
+            shipsQ.remove();
+        }
+
 
     }
 
