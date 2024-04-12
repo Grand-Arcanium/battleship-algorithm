@@ -2,7 +2,6 @@
   <library name="BattleShip2API">
     <CLASSES>
       <root url="jar://$PROJECT_DIR$/BattleShip2API.jar!/" />
-      <root url="jar://$PROJECT_DIR$/src/BattleShip3API.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
