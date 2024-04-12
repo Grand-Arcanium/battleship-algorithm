@@ -112,8 +112,12 @@ public class SSCairnsBot implements BattleShipBot {
     }
 
     private void kludgeCheck() {
-        if(used.size() == gameSize * gameSize) {
-            throw new RuntimeException("We ran out of places to search!");
+        if(used.size() == (gameSize * gameSize)) {
+/*            System.out.println(used.size());
+            System.out.println(battleShip.allSunk());*/
+            if(!battleShip.allSunk()){
+                throw new RuntimeException("We ran out of places to search!");
+            }
         }
     }
 
