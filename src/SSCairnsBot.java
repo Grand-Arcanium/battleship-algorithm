@@ -28,6 +28,7 @@ public class SSCairnsBot implements BattleShipBot {
     private Stack<String> directions;
     private String checking;
     private String successDir;
+    private Stack<Point> sinkingShip;
 
     /**
      * Constructor keeps a copy of the BattleShip instance
@@ -65,6 +66,7 @@ public class SSCairnsBot implements BattleShipBot {
         used = new HashSet<>();
         pTargets = new Stack<>();
         directions = new Stack<>();
+        sinkingShip = new Stack<>();
     }
 
     /**
@@ -75,7 +77,6 @@ public class SSCairnsBot implements BattleShipBot {
 
     @Override
     public void fireShot() {
-        kludgeCheck();
         Point objective;
         if (isHunt) {
             objective = hunt();
@@ -92,9 +93,11 @@ public class SSCairnsBot implements BattleShipBot {
             hitCount++;
             huntedTarget = objective;
             setUpTargets(objective);
+            sinkingShip.push(objective);
             //heatMap[y][x] = 0;
         } else if(hit && !isHunt){
             successDir = checking;
+            sinkingShip.push(objective);
             followUpTarget(objective);
             trimMismatches();
         } else if (!hit && !isHunt){
@@ -103,11 +106,15 @@ public class SSCairnsBot implements BattleShipBot {
         if(!isHunt && pTargets.size() == 0) {
             isHunt = true;
             successDir = null;
+            eliminateAdjacent();
         }
+        kludgeCheck();
     }
 
     private void kludgeCheck() {
-        if(used.size() >= gameSize * gameSize) throw new RuntimeException("We ran out of places to search!");
+        if(used.size() == gameSize * gameSize) {
+            throw new RuntimeException("We ran out of places to search!");
+        }
     }
 
     /*
@@ -259,6 +266,24 @@ public class SSCairnsBot implements BattleShipBot {
         while(directions.size() > 0 && !directions.peek().equals(successDir)){
             directions.pop();
             used.add(pTargets.pop());
+        }
+    }
+
+    private void eliminateAdjacent(){
+        while (sinkingShip.size() > 0){
+            Point prevHit = sinkingShip.pop();
+            if (leftAvail(prevHit.x)){
+                used.add(new Point(prevHit.x - 1, prevHit.y));
+            }
+            if (rightAvail(prevHit.x)){
+                used.add(new Point(prevHit.x + 1, prevHit.y));
+            }
+            if (topAvail(prevHit.y)){
+                used.add(new Point(prevHit.x, prevHit.y - 1));
+            }
+            if (bottomAvail(prevHit.y)){
+                used.add(new Point(prevHit.x, prevHit.y + 1));
+            }
         }
     }
 
